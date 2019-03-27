@@ -12,25 +12,25 @@ JOINTS_SPLIT = {'Spine': [0, 1, 20], 'Head': [2, 3],
 
 def get_joints(data_path: str):
     joints = dict()
-    body = scipy.io.loadmat(f"{data_path}/body.mat")['body']
-    DEPTH = f"{data_path}/depth"
+    body = scipy.io.loadmat(f"{data_path}\\body.mat")['body']
+    DEPTH = f"{data_path}\\depth"
     names = get_image_name(DEPTH)
     for frame in range(len(body)):
         for k in range(6):
             if body[frame][k]['isBodyTracked'] == 1:
                 joint_tracked = body[frame][k]['joints']
-                joints[f"{data_path}/depth/{names[frame]}"] = dict()
+                joints[f"{data_path}\\depth\\{names[frame]}"] = dict()
                 # joints[frame] = dict()
                 for i in range(len(joint_tracked[0][0][0])):
                     if joint_tracked[0][0][0][i]['trackingState'][0][0][0][0] == 0:
-                        joints[f"{data_path}/depth/{names[frame]}"][i] = (-1, -1)
+                        joints[f"{data_path}\\depth\\{names[frame]}"][i] = (-1, -1)
                     # elif joint_tracked[0][0][0][i]['trackingState'][0][0][0][0] == 1:
                     #     joints[f"{data_path}/depth/{names[frame]}"][i] = (-1, -1)
                     else:
                         for j in joint_tracked[0][0][0][i]['depth'][0]:
                             x = j[0][0]
                             y = j[1][0]
-                            joints[f"{data_path}/depth/{names[frame]}"][i] = (round(x), round(y))
+                            joints[f"{data_path}\\depth\\{names[frame]}"][i] = (round(x), round(y))
                             # joints[frame][i] = (x, y)
                 break
     return joints

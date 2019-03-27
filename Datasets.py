@@ -32,8 +32,11 @@ W_SUB = ['kitchen', 'office']
 MEAN = 1631.0
 STD = 707.0
 
-OFFICE_SPLIT = ['data_03-58-25', 'data_03-25-32', 'data_02-32-08', 'data_03-05-15']
-KITCHEN_SPLIT = ['data_04-51-42', 'data_04-52-02', 'data_02-10-35', 'data_03-45-21']
+# OFFICE_SPLIT = ['data_03-58-25', 'data_03-25-32', 'data_02-32-08', 'data_03-05-15', 'data_11-11-59',
+#                 'data_03-21-23', 'data_03-35-07', 'data_03-04-16', 'data_04-30-36', 'data_02-50-20']
+# KITCHEN_SPLIT = ['data_04-51-42', 'data_04-52-02', 'data_02-10-35', 'data_03-45-21', 'data_03-53-06',
+#                  'data_12-07-43', 'data_05-04-12', 'data_04-27-09', 'data_04-13-06', 'data_01-52-55']
+KITCHEN_SPLIT = ['data_12-07-43', 'data_05-04-12', 'data_04-27-09', 'data_04-13-06', 'data_01-52-55']
 
 
 class ComposedDataset(Dataset):
@@ -54,51 +57,28 @@ class ComposedDataset(Dataset):
         self.P_ID = list()
         self.joints = dict()
 
-        """
-        print("Loading Pandora...")
-        self.P_ID = os.listdir("{}/{}".format(root_dir, PANDORA))
-        pandora_joints = dict()
-        # Load Pandora
-        for i in self.P_ID:
-            for t in P_SUB:
-                pandora_joints = {**pandora_joints, **pandora.get_joints("{}/{}/{}/{}{}".format(root_dir, PANDORA, i, t, i),
-                                                                         "{}/{}/{}{}".format(PANDORA, i, t, i))}
-        print("Done.")
-        """
-
-        if split == "train":
-            name = 'train_name'
-        else:
-            root_dir = f"{root_dir}/../train"
-            name = 'test_name'
-
         # Load Watch-n-patch
         print("Loading Watch-n-patch...",)
-        mat = scipy.io.loadmat(f"{root_dir}/{PATCH}/data_splits/kitchen_split.mat")
-        kitchen_splits = mat[name][0]
-        mat = scipy.io.loadmat(f"{root_dir}/{PATCH}/data_splits/office_split.mat")
-        office_splits = mat[name][0]
+        mat = scipy.io.loadmat(f"{root_dir}\\{PATCH}\\data_splits\\kitchen_split.mat")
+        kitchen_splits = mat['test_name'][0]
+        # mat = scipy.io.loadmat(f"{root_dir}\\{PATCH}\\data_splits\\office_split.mat")
+        # office_splits = mat['test_name'][0]
         patch_joints = dict()
         for el in kitchen_splits:
             if el not in KITCHEN_SPLIT:
                 continue
-            patch_joints = {**patch_joints, **watch_n_patch.get_joints(f"{root_dir}/{PATCH}/kitchen/{el[0]}")}
-        for el in office_splits:
-            if el not in OFFICE_SPLIT:
-                continue
-            patch_joints = {**patch_joints, **watch_n_patch.get_joints(f"{root_dir}/{PATCH}/office/{el[0]}")}
+            patch_joints = {**patch_joints, **watch_n_patch.get_joints(f"{root_dir}\\{PATCH}\\kitchen\\{el[0]}")}
+        # for el in office_splits:
+        #     if el not in OFFICE_SPLIT:
+        #         continue
+        #     patch_joints = {**patch_joints, **watch_n_patch.get_joints(f"{root_dir}\\{PATCH}\\office\\{el[0]}")}
         print("Done.")
 
-        # self.size = len(pandora_joints) + len(patch_joints) # + len(cad60_joints) + len(cad120_joints)
         self.size = len(patch_joints)
-        # self.size = len(pandora_joints) + len(patch_joints)
 
         process = psutil.Process(os.getpid())
         byte = process.memory_info().rss
         print("{} images loaded, {}Gb in use.\n".format(self.size, round(byte/1000000000, 3)))
-        # print("Pandora dim = {}; Patch dim = {}".format(len(pandora_joints), len(patch_joints)))
-        # self.joints = {**patch_joints}
-        # self.joints = {**pandora_joints, **patch_joints}
         self.joints = {**patch_joints}
 
 
@@ -140,6 +120,7 @@ def main():
     print("Starting data loader.")
     for data_tuple in d:
         cv2.imshow()
+
 
 if __name__ == '__main__':
     main()

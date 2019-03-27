@@ -5,14 +5,21 @@ import json
 import os
 import cv2
 import tkinter
+import tkinter.ttk as ttk
 from tkinter import simpledialog
 from torch.utils.data import Dataset
 import argparse
 
 
+# SPLIT = ['data_03-58-25', 'data_03-25-32', 'data_02-32-08', 'data_03-05-15', 'data_11-11-59',
+#                 'data_03-21-23', 'data_03-35-07', 'data_03-04-16', 'data_04-30-36', 'data_02-50-20']
+SPLIT = ['data_12-07-43', 'data_05-04-12', 'data_04-27-09', 'data_04-13-06', 'data_01-52-55']
+
+
 class Noter:
-    def __init__(self, d: Dataset, ann_path, scale, radius):
+    def __init__(self, d: Dataset, ann_path, scale, radius, next_skip):
         self.radius = radius
+        self.next_skip = next_skip
         self.is_clicked = False
         self.is_modifying = False
         self.point = [-1, -1]
@@ -23,11 +30,22 @@ class Noter:
         self.master = tkinter.Tk()
         self.info = tkinter.StringVar()
         self.error = tkinter.StringVar()
+        self.status = tkinter.StringVar()
+        self.sequences = tkinter.StringVar()
+        self.tot = len(SPLIT)
+
+        self.progressbar = ttk.Progressbar(self.master, orient="horizontal", length=100, mode="determinate")
+        self.progressbar.pack(side=tkinter.BOTTOM)
+
         self.scale = scale
         tkinter.Label(master=self.master, textvariable=self.info).pack()
         tkinter.Label(master=self.master, textvariable=self.error, width=25).pack()
+        tkinter.Label(master=self.master, textvariable=self.status).pack()
+        tkinter.Label(master=self.master, textvariable=self.sequences).pack()
         self.info.set("....")
         self.error.set("....")
+        self.status.set("....")
+        self.sequences.set("....")
         self.dataset = d
         self.image_list = list()
         self.json_dict = dict()
@@ -44,28 +62,44 @@ class Noter:
                 if skip_or_keep == "keep":
                     kpts = np.array(self.json_dict[name])
                 else:
+                    if name.split("\\")[4] in SPLIT:
+                        SPLIT.remove(name.split("\\")[4])
                     continue
 
             if next_name:
-                if name.split('/')[-3] != next_name:
+                if name.split('\\')[-3] != next_name:
                     next_name = None
                     cv2.destroyAllWindows()
                 else:
                     continue
 
-            rgb_name = name.split('/')
+            seq = len(os.listdir("\\".join(name.split("\\")[:-1])))
+            curr_seq = int(name.split("\\")[-1].split(".")[-2])
+
+            if (curr_seq - 1) % self.next_skip != 0:
+                continue
+
+            self.progressbar["value"] = curr_seq
+            self.progressbar["maximum"] = seq
+            self.status.set(f"[{curr_seq}] di [{seq}]")
+            if name.split("\\")[4] in SPLIT:
+                SPLIT.remove(name.split("\\")[4])
+            self.sequences.set(f"sequenza [{self.tot - len(SPLIT) + 1}] di  [{self.tot}]")
+            self.master.update()
+
+            rgb_name = name.split('\\')
             if name.split('.')[-1] == 'png':
                 rgb_name[-2] = 'RGB'
                 last_split = rgb_name[-1].split('_')
                 last_split[-1] = 'RGB.png'
                 rgb_name[-1] = "_".join(last_split)
-                rgb_name = "/".join(rgb_name)
+                rgb_name = "\\".join(rgb_name)
             if name.split('.')[-1] == 'mat':
                 rgb_name[-2] = 'rgbjpg'
                 last_split = rgb_name[-1].split('.')
                 last_split[-1] = 'jpg'
                 rgb_name[-1] = ".".join(last_split)
-                rgb_name = "/".join(rgb_name)
+                rgb_name = "\\".join(rgb_name)
 
             rgb = cv2.imread(rgb_name)
             rgb = cv2.resize(rgb, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC)
@@ -82,8 +116,8 @@ class Noter:
             self.draw_kpts(tmp, kpts, self.radius)
             cv2.namedWindow(name)
             cv2.namedWindow(rgb_name)
-            cv2.moveWindow(rgb_name, 900, 300)
-            cv2.moveWindow(name, 300, 300)
+            cv2.moveWindow(rgb_name, 750, 300)
+            cv2.moveWindow(name, 15, 150)
             cv2.setMouseCallback(name, self.click_left, [name, tmp, kpts])
 
             while True:
@@ -118,7 +152,7 @@ class Noter:
                     print("Changing sequence.")
                     self.error.set("Changing sequence.")
                     self.master.update()
-                    next_name = name.split('/')[-3]
+                    next_name = name.split('\\')[-3]
                     self.reset()
                     break
 
@@ -179,6 +213,10 @@ class Noter:
                         self.draw_kpts(tmp, kpts, self.radius)
                         self.reset()
 
+        with open(self.annotation_path, 'w') as f:
+            json.dump(self.json_dict, f)
+        exit(1)
+
     def reset(self):
         self.is_modifying = False
         self.is_clicked = False
@@ -186,6 +224,7 @@ class Noter:
         self.obj_idx = -1
         self.kpt_idx = -1
         self.point = [-1, -1]
+
 
     @staticmethod
     def draw_kpts(img, kpts, radius):
@@ -283,16 +322,18 @@ class Noter:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, dest='data_dir', help='Data directory.')
-    parser.add_argument('--split', type=str, dest='split', help='Dataset split for custom dataset.')
+    parser.add_argument('--data_dir', type=str, dest='data_dir', help='Data directory.', required=True)
+    parser.add_argument('--split', type=str, dest='split', default="test", help='Dataset split for custom dataset.')
     parser.add_argument('--out', type=str, default='good_annotations', dest='out', help='Output file path.')
     parser.add_argument('--k', type=str, default='skip',
                         dest='keep_or_skip', help='Keep or skip image already annotated')
-    parser.add_argument('--scake', type=float, default=1.5, dest='scale', help='Depth image scale.')
+    parser.add_argument('--scale', type=float, default=1.4, dest='scale', help='Depth image scale.')
     parser.add_argument('--radius', type=int, default=6, dest='radius', help='Joint annotation radius.')
+    parser.add_argument('--next', type=int, default=1, dest='next', help='Skippin [next] image.')
     parser.add_argument('--add_path', type=str, default='/projects/hand_detection/patch_fixed_joints.json',
                         dest='ann_path', help='Joint annotation path.')
     args = parser.parse_args().__dict__
 
-    n = Noter(ComposedDataset(args['data_dir'], split=args['split']), args['out'], args['scale'], args['radius'])
+    n = Noter(ComposedDataset(args['data_dir'], split=args['split']), "local_ann_kitchen.json",
+              args['scale'], args['radius'], args['next'])
     n.start(args['keep_or_skip'])
