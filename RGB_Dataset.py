@@ -38,11 +38,11 @@ class ComposedDataset(Dataset):
         for el in kitchen_splits:
             if el not in KITCHEN_SPLIT:
                 continue
-            patch_joints = {**patch_joints, **watch_n_patch.get_joints(os.path.join(root_dir, PATCH, "kitchen", el[0]))}
+            patch_joints = {**patch_joints, **watch_n_patch.get_joints_rgb(os.path.join(root_dir, PATCH, "kitchen", el[0]))}
         for el in office_splits:
             if el not in OFFICE_SPLIT:
                 continue
-            patch_joints = {**patch_joints, **watch_n_patch.get_joints(os.path.join(root_dir, PATCH, "office", el[0]))}
+            patch_joints = {**patch_joints, **watch_n_patch.get_joints_rgb(os.path.join(root_dir, PATCH, "office", el[0]))}
         print("Done.")
 
         self.size = len(patch_joints)
@@ -55,23 +55,12 @@ class ComposedDataset(Dataset):
 
     def __getitem__(self, idx):
         name = list(self.joints.keys())[idx]
-        name_rgb = name.replace(name[name.find("."):], ".jpg").replace("depth", "rgbjpg")
 
-        img = scipy.io.loadmat(name)['depth']
-        img_rgb = cv2.imread(name_rgb)
-
-        arr = np.array(img)
-        tmp = np.zeros((arr.shape[0], arr.shape[1], 3))
-        tmp[:, :, 0] = arr
-        tmp[:, :, 1] = arr
-        tmp[:, :, 2] = arr
-        img = tmp
+        img = cv2.imread(name)
+        img = cv2.resize(img, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC)
 
         kpts = [i for i in self.joints[name].values()]
         kpts = np.array(kpts)
         kpts = kpts[np.newaxis, :]
 
-        img = img * 255 / np.amax(img)
-        img = img.astype(np.uint8)
-
-        return [img, img_rgb], kpts, [name, name_rgb]
+        return img, kpts * 0.4, name
